@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def get_lost():
-    return ["MS-SSIM", "corrected_MS-SSIM", "MDTVSFA", "corrected_ERQA", "bitrate", "std_colorfulness"]
+    return ["MS-SSIM", "corrected_MS-SSIM", "MDTVSFA", "corrected_MDTVSFA", "corrected_ERQA", "bitrate", "std_colorfulness", "SI", "TI"]
 
 def get_datasets():
     data_file = "updated_data.csv"

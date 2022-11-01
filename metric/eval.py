@@ -1,22 +1,38 @@
 import pickle
 import numpy as np
-import lpips
+from get_values import calculate_ERQA_and_LPIPS_and_color_on_video, \
+    calculate_SI_TI, calculate_MDTVSFA, calculate_ERQA_and_LPIPS_and_color_on_frame
 
-metric = pickle.load(open("models/model.pkl", 'rb'))
-scaler = pickle.load(open("models/scaler.pkl", 'rb'))
 
-ERQA_value = 0.5323870049464775
-LPIPS_value = 0.22963963157894735
-ERQAxLPIPS_value = 0.37344376365681164
-ERQAxMDTVSFA_value = 0.2571909805397002
-SI = 0.01128343621399177
-TI = 0.5934244224245432
-colorfulness = 10.601520481769922
+def mymetric(gt, dist, video=True):
+    if video:
+        metric = pickle.load(open("models/model.pkl", 'rb'))
+        scaler = pickle.load(open("models/scaler.pkl", 'rb'))
 
-tensor = np.array([[ERQA_value, LPIPS_value, ERQAxLPIPS_value,
-    ERQAxMDTVSFA_value, SI, TI, colorfulness]])
+        MDTVSFA_value = calculate_MDTVSFA(dist)
+        ERQA_value, LPIPS_value, colorfulness = calculate_ERQA_and_LPIPS_and_color_on_video(gt, dist)
+        ERQAxLPIPS_value = ERQA_value * (1 - LPIPS_value)
+        ERQAxMDTVSFA_value = ERQA_value * MDTVSFA_value
+        SI, TI = calculate_SI_TI(dist)
 
-tensor = scaler.transform(tensor)
+        tensor = np.array([[ERQA_value, LPIPS_value, ERQAxLPIPS_value,
+            ERQAxMDTVSFA_value, SI, TI, colorfulness]])
 
-result = metric.predict(tensor)[0]
-print(result)
+        tensor = scaler.transform(tensor)
+
+        result = metric.predict(tensor)[0]
+        return result
+    else:
+        metric = pickle.load(open("models/model_image.pkl", 'rb'))
+        scaler = pickle.load(open("models/scaler_image.pkl", 'rb'))
+
+        ERQA_value, LPIPS_value, colorfulness = calculate_ERQA_and_LPIPS_and_color_on_frame(gt, dist)
+        ERQAxLPIPS_value = ERQA_value * (1 - LPIPS_value)
+
+        tensor = np.array([[ERQA_value, LPIPS_value, ERQAxLPIPS_value,
+            colorfulness]])
+
+        tensor = scaler.transform(tensor)
+
+        result = metric.predict(tensor)[0]
+        return result
