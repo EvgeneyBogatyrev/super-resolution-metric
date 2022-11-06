@@ -74,8 +74,6 @@ def calculate_ERQA_and_LPIPS_and_color_on_frame(gt_path, dist_path):
 
 
 def calculate_MDTVSFA(video_path, video_params=None):
-    #video_path = check_file_format(video_path, video_params, gt=False)
-    print(video_params)
     if video_params is None:
         os.system(f"python MDTVSFA/test_demo.py --model_path=MDTVSFA/models/MDTVSFA.pt \
             --video_path={video_path} > res.txt")
@@ -101,7 +99,6 @@ def calculate_MDTVSFA(video_path, video_params=None):
 
 
 def calculate_SI_TI(video_path, video_params=None):
-    #video_path = check_file_format(video_path, video_params, gt=False)
     add = ""
     if video_params is not None:
         if video_params["video_format"] == "YUV420":
@@ -192,8 +189,6 @@ def check_file_format(video_path, video_params, gt=False):
         else:
             tmp_path = "./__dist.mp4"
         os.system(f"ffmpeg -y -hide_banner -loglevel error -s {video_params['video_size'][0]}x{video_params['video_size'][1]} -r {video_params['fps']}\
-            -pix_fmt yuv420p -i {video_path} -c:v libx264 -crf 0 {tmp_path}")
-        print(f"ffmpeg -y -hide_banner -loglevel error -s {video_params['video_size'][0]}x{video_params['video_size'][1]} -r {video_params['fps']}\
             -pix_fmt yuv420p -i {video_path} -c:v libx264 -crf 0 {tmp_path}")
         return tmp_path
     assert video_params["video_format"] == 'YUV420' or video_params["video_format"] == 'RGB'
