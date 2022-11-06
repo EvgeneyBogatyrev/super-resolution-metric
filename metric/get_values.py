@@ -7,10 +7,13 @@ from skimage import color
 from erqa import ERQA
 
 
-def calculate_ERQA_and_LPIPS_and_color_on_video(gt_path, dist_path):
+def calculate_ERQA_and_LPIPS_and_color_on_video(gt_path, dist_path, gt_params=None, dist_params=None):
     metric = ERQA()
     loss_fn_alex = lpips.LPIPS(net='alex')
-        
+    
+    gt_path = check_file_format(gt_path, gt_params, gt=True)
+    dist_path = check_file_format(dist_path, dist_params, gt=False)
+
     vidcap_gt = cv2.VideoCapture(gt_path)
     success_gt, image_gt = vidcap_gt.read()
 
@@ -20,24 +23,27 @@ def calculate_ERQA_and_LPIPS_and_color_on_video(gt_path, dist_path):
     values_erqa = []
     values_lpips = []
     values_color = []
+    counter = 0
     while success_gt and success_dist:
-        # ERQA
-        value = metric(image_dist, image_gt)
-        values_erqa.append(value)
+        if counter % 5 == 0:        
+            # ERQA
+            value = metric(image_dist, image_gt)
+            values_erqa.append(value)
 
-        # Colorfulness
-        colorfulness = calculate_colorfullness(image_dist)
-        values_color.append(colorfulness)
+            # Colorfulness
+            colorfulness = calculate_colorfullness(image_dist)
+            values_color.append(colorfulness)
 
-        # LPIPS
-        image_gt = image_gt.transpose((2, 0, 1))
-        image_dist = image_dist.transpose((2, 0, 1))
+            # LPIPS
+            image_gt = image_gt.transpose((2, 0, 1))
+            image_dist = image_dist.transpose((2, 0, 1))
 
-        gt = torch.tensor(image_gt.reshape(1, *image_gt.shape))
-        dist = torch.tensor(image_dist.reshape(1, *image_gt.shape))
+            gt = torch.tensor(image_gt.reshape(1, *image_gt.shape))
+            dist = torch.tensor(image_dist.reshape(1, *image_gt.shape))
 
-        value = loss_fn_alex(gt, dist)
-        values_lpips.append(value.detach()[0][0][0][0])
+            value = loss_fn_alex(gt, dist)
+            values_lpips.append(value.detach()[0][0][0][0])
+        counter += 1
 
         success_gt, image_gt = vidcap_gt.read()
         success_dist, image_dist = vidcap_dist.read()
@@ -67,9 +73,17 @@ def calculate_ERQA_and_LPIPS_and_color_on_frame(gt_path, dist_path):
     return value_erqa, value_lpips, colorfulness
 
 
-def calculate_MDTVSFA(video_path):
-    os.system(f"python MDTVSFA/test_demo.py --model_path=MDTVSFA/models/MDTVSFA.pt \
-         --video_path={video_path} > res.txt")
+def calculate_MDTVSFA(video_path, video_params=None):
+    #video_path = check_file_format(video_path, video_params, gt=False)
+    print(video_params)
+    if video_params is None:
+        os.system(f"python MDTVSFA/test_demo.py --model_path=MDTVSFA/models/MDTVSFA.pt \
+            --video_path={video_path} > res.txt")
+    else:
+        video_size = video_params["video_size"]
+        os.system(f"python MDTVSFA/test_demo.py --model_path=MDTVSFA/models/MDTVSFA.pt \
+            --video_path={video_path} --video_width {video_size[0]} --video_height {video_size[1]}\
+                 --video_format {video_params['video_format']}> res.txt")
     with open("res.txt", "r") as f:
         lines = list(f.readlines())
         for i, line in enumerate(lines):
@@ -80,12 +94,22 @@ def calculate_MDTVSFA(video_path):
     if os.path.exists("res.txt"):
         os.remove("res.txt")
 
-    return float(value)
+    try:
+        return float(value)
+    except:
+        return -1
 
 
-def calculate_SI_TI(video_path):
+def calculate_SI_TI(video_path, video_params=None):
+    #video_path = check_file_format(video_path, video_params, gt=False)
+    add = ""
+    if video_params is not None:
+        if video_params["video_format"] == "YUV420":
+            add = f" -s {video_params['video_size'][0]}x{video_params['video_size'][1]} \
+                -r {video_params['fps']} -pix_fmt yuv420p "
+    
     path_to_encoded = "tmp.mp4"
-    cmd = f'ffmpeg -hide_banner -loglevel error -i {video_path} -c:v libx264 -qp 28 -b_qfactor 1 -i_qfactor 1 -an {path_to_encoded}'
+    cmd = f'ffmpeg -hide_banner -loglevel error {add} -i {video_path} -c:v libx264 -qp 28 -b_qfactor 1 -i_qfactor 1 -an {path_to_encoded}'
     os.system(cmd)
     
     cmd = f'ffprobe -hide_banner -loglevel error -show_frames {path_to_encoded} > tmp_output.txt'
@@ -157,3 +181,22 @@ def calculate_colorfullness(image):
     mean_chroma = chroma.mean()
 
     return sigma + 0.94 * mean_chroma
+
+
+def check_file_format(video_path, video_params, gt=False):
+    if video_params is None:
+        return video_path
+    if video_params["video_format"] == "YUV420":
+        if gt:
+            tmp_path = "./__gt.mp4"
+        else:
+            tmp_path = "./__dist.mp4"
+        os.system(f"ffmpeg -y -hide_banner -loglevel error -s {video_params['video_size'][0]}x{video_params['video_size'][1]} -r {video_params['fps']}\
+            -pix_fmt yuv420p -i {video_path} -c:v libx264 -crf 0 {tmp_path}")
+        print(f"ffmpeg -y -hide_banner -loglevel error -s {video_params['video_size'][0]}x{video_params['video_size'][1]} -r {video_params['fps']}\
+            -pix_fmt yuv420p -i {video_path} -c:v libx264 -crf 0 {tmp_path}")
+        return tmp_path
+    assert video_params["video_format"] == 'YUV420' or video_params["video_format"] == 'RGB'
+    return video_path
+
+        
